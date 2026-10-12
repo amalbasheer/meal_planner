@@ -417,7 +417,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
         {/* Top Header Bar */}
-<header className="p-4 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+  <header className="p-4 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
   
   {/* Title & Date Info */}
   <div>
