@@ -418,13 +418,15 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
         
         {/* Top Header Bar */}
         <header className="p-5 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2"></div>
           <div>
             <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Foodie Meal Planner</span>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
             <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-800/60"></div>
             <div className="bg-amber-800/80 px-4 py-2 rounded-xl border border-amber-700/50 text-center">
               <span className="block text-xs text-amber-300">Active Schedule</span>
               <span className="text-sm font-bold text-amber-100">
@@ -446,7 +448,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
             </button>
             {/* 👇 Logged-In User Info & Logout Button */}
     <div className="flex items-center gap-2.5 bg-amber-950/50 px-3.5 py-2 rounded-xl border border-amber-700/40">
-      <div className="text-left">
+      <div className="text-left m-w-0">
         <span className="block text-[10px] uppercase tracking-wider text-amber-300/80">Signed in</span>
         <span className="text-xs font-medium text-amber-100 truncate max-w-[140px] block" title={userEmail || ''}>
           {userEmail || 'User'}
@@ -459,7 +461,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
       >
         Logout
       </button>
-    </div>
+    
           </div>
         </header>
 
@@ -743,7 +745,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
 {/* ========================================================= */}
 {/* 3. Floating Bottom-Right AI Copilot Widget & Toggle Button */}
 {/* ========================================================= */}
-<div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+<div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
 
   {/* Floating Chat Drawer */}
   {isCopilotOpen && (
@@ -807,8 +809,8 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
 
       {/* --- MODAL 1: USER PREFERENCES --- */}
       {showPrefModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-amber-100 space-y-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-[92vw] max-w-md p-5 sm:p-6 shadow-2xl border border-amber-100 space-y-4 my-auto">
             <h3 className="text-lg font-serif font-bold text-stone-800">Configure Food Preferences</h3>
             
             {/* Cuisine Selection */}
@@ -886,8 +888,8 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
 
       {/* --- MODAL 2: CUSTOMISE / ADD DISH --- */}
       {showCustomModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-amber-100 space-y-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-[92vw] max-w-md p-5 sm:p-6 shadow-2xl border border-amber-100 space-y-4 my-auto">
             <h3 className="text-lg font-serif font-bold text-stone-800">
               Set {selectedDay} {activeSlot}
             </h3>
