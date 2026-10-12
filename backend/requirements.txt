@@ -1,0 +1,7 @@
+FastAPI
+Uvicorn
+supabase
+SQLAlchemy
+pydantic
+Groq
+python-dotenv

@@ -26,11 +26,12 @@ origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
+    "https://mealplanner-amalbasheer.vercel.app/"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Local development permission
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +40,9 @@ app.add_middleware(
 # Supabase Client Initialization
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+if SUPABASE_URL is None or SUPABASE_KEY is None:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==================== DATA MODELS ====================
