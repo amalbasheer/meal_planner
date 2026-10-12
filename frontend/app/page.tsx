@@ -414,56 +414,66 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
   return (
     <div className="w-full min-h-screen bg-amber-50/30 text-stone-900 pb-12">
       {/* Container */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
         {/* Top Header Bar */}
-        <header className="p-5 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2"></div>
-          <div>
-            <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Foodie Meal Planner</span>
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
-            <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
-          </div>
+<header className="p-4 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+  
+  {/* Title & Date Info */}
+  <div>
+    <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Foodie Meal Planner</span>
+    <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
+    <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
+  </div>
 
-          
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-800/60"></div>
-            <div className="bg-amber-800/80 px-4 py-2 rounded-xl border border-amber-700/50 text-center">
-              <span className="block text-xs text-amber-300">Active Schedule</span>
-              <span className="text-sm font-bold text-amber-100">
-                {weeklyPlans.length} / {enabledMeals.length * 7} Meals
-              </span>
-            </div>
-            <button 
-              onClick={() => setShowPrefModal(true)}
-              className="bg-amber-800/90 hover:bg-amber-700 border border-amber-600/50 text-amber-100 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
-            >
-              <Utensils className="w-4 h-4" />
-              Food Preferences
-            </button>
-            <button 
-              onClick={handleAutoGenerateMenu}
-              className="bg-amber-500 hover:bg-amber-400 text-amber-950 px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
-            >
-              <Menu className="w-4 h-4" /> Generate Menu
-            </button>
-            {/* 👇 Logged-In User Info & Logout Button */}
-    <div className="flex items-center gap-2.5 bg-amber-950/50 px-3.5 py-2 rounded-xl border border-amber-700/40">
-      <div className="text-left m-w-0">
-        <span className="block text-[10px] uppercase tracking-wider text-amber-300/80">Signed in</span>
-        <span className="text-xs font-medium text-amber-100 truncate max-w-[140px] block" title={userEmail || ''}>
+  {/* Actions Toolbar */}
+  <div className="flex flex-wrap items-center gap-2.5">
+    
+    {/* Active Schedule Pill */}
+    <div className="bg-amber-800/80 px-3.5 py-2 rounded-xl border border-amber-700/50 text-center shrink-0">
+      <span className="block text-[10px] uppercase text-amber-300 font-semibold">Active Schedule</span>
+      <span className="text-xs font-bold text-amber-100">
+        {weeklyPlans.length} / {enabledMeals.length * 7} Meals
+      </span>
+    </div>
+
+    {/* Food Preferences Button */}
+    <button 
+      onClick={() => setShowPrefModal(true)}
+      className="bg-amber-800/90 hover:bg-amber-700 border border-amber-600/50 text-amber-100 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 shrink-0"
+    >
+      <Utensils className="w-4 h-4" />
+      <span>Food Preferences</span>
+    </button>
+
+    {/* Generate Menu Button */}
+    <button 
+      onClick={handleAutoGenerateMenu}
+      className="bg-amber-500 hover:bg-amber-400 text-amber-950 px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 shrink-0"
+    >
+      <Menu className="w-4 h-4" />
+      <span>Generate Menu</span>
+    </button>
+
+    {/* Logged-In User Info & Logout Button (Full Width Mobile / Flex Desktop) */}
+    <div className="flex-1 sm:flex-initial flex items-center justify-between gap-3 bg-amber-950/50 px-3.5 py-2 rounded-xl border border-amber-700/40 min-w-0">
+      <div className="text-left min-w-0 flex-1">
+        <span className="block text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">Signed in</span>
+        <span className="text-xs font-medium text-amber-100 truncate block max-w-[180px] sm:max-w-xs md:max-w-none" title={userEmail || ''}>
           {userEmail || 'User'}
         </span>
       </div>
       <button 
         onClick={handleLogout}
-        className="bg-amber-900/80 hover:bg-red-900/80 text-amber-200 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border border-amber-700/60"
+        className="bg-amber-900/80 hover:bg-red-900/80 text-amber-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border border-amber-700/60 shrink-0"
         title="Sign Out"
       >
         Logout
       </button>
-    
-          </div>
-        </header>
+    </div>
+
+  </div>
+</header> 
 
         {/* Week Selection & Navigation Bar */}
 <div className="bg-white border border-amber-200/60 rounded-2xl p-4 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
