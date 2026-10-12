@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
          ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
          CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot,
-         Edit,
+         Edit, AlarmClock,
          ChefHat,
          Clock,
 } from 'lucide-react';
@@ -68,6 +68,8 @@ function getMondayOfCurrentWeek(): string {
 export default function MealPlannerPage() {
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [weeklyPlans, setWeeklyPlans] = useState<MealPlan[]>([]);
+  const [prepTasks, setPrepTasks] = useState<any[]>([]);
+  const [activeAlertTask, setActiveAlertTask] = useState<any>(null);
   
 
   // Modals state
@@ -358,6 +360,95 @@ const handleTogglePrepDone = async (plan: any, currentStatus: boolean) => {
   }
 };
 
+// 1. Fetch Today's Un-triggered Tasks & Request Notification Permission
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    fetchTodayPrepTasks();
+  }, [userId]);
+
+  const fetchTodayPrepTasks = async () => {
+    const todayStr = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    
+    const { data, error } = await supabase
+      .from('user_prep_tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('reminder_date', todayStr)
+      .eq('triggered', false)
+      .eq('completed', false);
+
+    if (error) {
+      console.error('Error fetching user prep tasks:', error);
+    } else if (data) {
+      setPrepTasks(data);
+    }
+  };
+
+  // 2. Background Timer Interval (Checks Every 30 Seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      // Format current time to match "HH:mm" (24-hour format)
+      const currentTimeString = now.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: false 
+      }); 
+
+      prepTasks.forEach(async (task) => {
+        // task.reminder_time from Postgres is usually "20:00:00", match the first 5 chars ("20:00")
+        const taskTimeFormatted = task.reminder_time ? task.reminder_time.slice(0, 5) : '20:00';
+
+        if (taskTimeFormatted === currentTimeString && !task.triggered) {
+          
+          // A. Set Active Visual Banner Alert
+          setActiveAlertTask(task);
+
+          // B. Play Audio Alarm Sound
+          try {
+            const audio = new Audio('../alarm.mp3');
+            audio.play();
+          } catch (err) {
+            console.log("Audio play blocked by browser interaction policy:", err);
+          }
+
+          // C. Trigger Web Push Notification
+          if (typeof window !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('🍳 Foodie Prep Alert', {
+              body: `${task.title}${task.description ? `: ${task.description}` : ''}`,
+              icon: '/icon.png',
+            });
+          }
+
+          // D. Mark as triggered in Supabase
+          await supabase
+            .from('user_prep_tasks')
+            .update({ triggered: true })
+            .eq('id', task.id);
+
+          // E. Remove from active local queue
+          setPrepTasks(prev => prev.filter(t => t.id !== task.id));
+        }
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [prepTasks]);
+
+  // 3. Mark Task as Complete when user clicks "Got it / Done"
+  const handleCompleteTask = async (taskId: number) => {
+    setActiveAlertTask(null);
+    await supabase
+      .from('user_prep_tasks')
+      .update({ completed: true })
+      .eq('id', taskId);
+  };
+
 // Handle Grocery Item Toggle (Mark as bought)
 const handleToggleGroceryItem = async (index: number, currentBought: boolean) => {
   try {
@@ -550,6 +641,30 @@ if (!userId) {
     </button>
   </div>
 </div>
+
+{/* ========================================= */}
+  {/* 🔔 ACTIVE PREP ALARM BANNER (INSERT HERE) */}
+  {/* ========================================= */}
+  {activeAlertTask && (
+    <div className="mb-6 bg-amber-500 text-amber-950 px-5 py-4 rounded-3xl shadow-xl flex items-center justify-between animate-bounce border-2 border-amber-300">
+      <div className="flex items-center gap-3">
+        <span className="text-3xl"><AlarmClock /> </span>
+        <div>
+          <h4 className="font-serif font-bold text-base">Meal Prep Reminder Alert!</h4>
+          <p className="text-sm font-semibold">{activeAlertTask.title}</p>
+          {activeAlertTask.description && (
+            <p className="text-xs text-amber-900">{activeAlertTask.description}</p>
+          )}
+        </div>
+      </div>
+      <button 
+        onClick={() => handleCompleteTask(activeAlertTask.id)}
+        className="bg-amber-950 text-amber-50 px-4 py-2 rounded-2xl text-xs font-semibold hover:bg-amber-900 transition-all shadow-md shrink-0"
+      >
+        Mark Done / Dismiss
+      </button>
+    </div>
+  )}
         {/* Preferences Summary Pill */}
         <div className="mt-4 bg-white/80 border border-amber-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between text-xs gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
