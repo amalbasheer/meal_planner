@@ -417,7 +417,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
         {/* Top Header Bar */}
-  <header className="p-4 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+<header className="p-4 sm:p-6 bg-amber-900 text-amber-50 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
   
   {/* Title & Date Info */}
   <div>
@@ -426,11 +426,11 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
   </div>
 
-  {/* Actions Toolbar */}
-  <div className="flex flex-wrap items-center gap-2.5">
+  {/* Actions Toolbar: Stacks 1-per-row on Mobile, Rows on Desktop */}
+  <div className="flex flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
     
     {/* Active Schedule Pill */}
-    <div className="bg-amber-800/80 px-3.5 py-2 rounded-xl border border-amber-700/50 text-center shrink-0">
+    <div className="bg-amber-800/80 px-3.5 py-2 rounded-xl border border-amber-700/50 text-center w-full sm:w-auto shrink-0">
       <span className="block text-[10px] uppercase text-amber-300 font-semibold">Active Schedule</span>
       <span className="text-xs font-bold text-amber-100">
         {weeklyPlans.length} / {enabledMeals.length * 7} Meals
@@ -440,7 +440,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     {/* Food Preferences Button */}
     <button 
       onClick={() => setShowPrefModal(true)}
-      className="bg-amber-800/90 hover:bg-amber-700 border border-amber-600/50 text-amber-100 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 shrink-0"
+      className="bg-amber-800/90 hover:bg-amber-700 border border-amber-600/50 text-amber-100 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto shrink-0"
     >
       <Utensils className="w-4 h-4" />
       <span>Food Preferences</span>
@@ -449,17 +449,17 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     {/* Generate Menu Button */}
     <button 
       onClick={handleAutoGenerateMenu}
-      className="bg-amber-500 hover:bg-amber-400 text-amber-950 px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 shrink-0"
+      className="bg-amber-500 hover:bg-amber-400 text-amber-950 px-4 py-2.5 sm:py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 w-full sm:w-auto shrink-0"
     >
       <Menu className="w-4 h-4" />
       <span>Generate Menu</span>
     </button>
 
-    {/* Logged-In User Info & Logout Button (Full Width Mobile / Flex Desktop) */}
-    <div className="flex-1 sm:flex-initial flex items-center justify-between gap-3 bg-amber-950/50 px-3.5 py-2 rounded-xl border border-amber-700/40 min-w-0">
+    {/* Logged-In User Info & Logout Button */}
+    <div className="flex items-center justify-between gap-3 bg-amber-950/50 px-3.5 py-2 rounded-xl border border-amber-700/40 w-full sm:w-auto min-w-0">
       <div className="text-left min-w-0 flex-1">
         <span className="block text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">Signed in</span>
-        <span className="text-xs font-medium text-amber-100 truncate block max-w-[180px] sm:max-w-xs md:max-w-none" title={userEmail || ''}>
+        <span className="text-xs font-medium text-amber-100 truncate block max-w-[200px] sm:max-w-xs md:max-w-none" title={userEmail || ''}>
           {userEmail || 'User'}
         </span>
       </div>
@@ -473,7 +473,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     </div>
 
   </div>
-</header> 
+</header>
 
         {/* Week Selection & Navigation Bar */}
 <div className="bg-white border border-amber-200/60 rounded-2xl p-4 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
