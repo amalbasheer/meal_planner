@@ -13,6 +13,14 @@ from dotenv import load_dotenv
 
 from urllib.parse import quote
 
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from contextlib import asynccontextmanager
+
+# Initialize Background Scheduler
+scheduler = BackgroundScheduler()
+
 load_dotenv()
 
 app = FastAPI(title="Foodie Meal Planner API")
@@ -107,6 +115,120 @@ class GroceryToggleRequest(BaseModel):
     is_bought: bool
 
 # ==================== HELPER FUNCTIONS ====================
+def auto_fill_all_users_next_week():
+    """
+    Runs every Sunday at 12:00 PM. 
+    Finds all users, checks if next week's plan is empty, and clones the previous week.
+    """
+    print("🕒 Running Sunday Auto-Fill Background Task for Next Week...")
+    try:
+        # 1. Calculate upcoming week's Monday (Next day is Monday, or calculate precisely)
+        today = datetime.now().date()
+        # If today is Sunday, next Monday is tomorrow (+1 day)
+        days_until_next_monday = (7 - today.weekday()) % 7
+        if days_until_next_monday == 0:
+            days_until_next_monday = 7
+        next_monday = today + timedelta(days=days_until_next_monday)
+        next_monday_str = next_monday.strftime("%Y-%m-%d")
+        
+        prev_monday = next_monday - timedelta(days=7)
+        prev_monday_str = prev_monday.strftime("%Y-%m-%d")
+
+        # 2. Get all unique users from Supabase (or active users)
+        users_response = supabase.table("weekly_plans").select("user_id").execute()
+        if not users_response.data:
+            return
+        
+        unique_user_ids = []
+        seen_user_ids = set()
+        for row in users_response.data:
+            if not isinstance(row, dict):
+                continue
+
+            user_id = row.get("user_id")
+            if user_id is None:
+                continue
+
+            normalized_user_id = str(user_id) if isinstance(user_id, (dict, list)) else user_id
+            if not isinstance(normalized_user_id, (str, int, float, bool)):
+                continue
+
+            if normalized_user_id not in seen_user_ids:
+                seen_user_ids.add(normalized_user_id)
+                unique_user_ids.append(normalized_user_id)
+
+            existing = supabase.table("weekly_plans") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .eq("week_start_date", next_monday_str) \
+                .execute()
+
+            if existing.data and len(existing.data) > 0:
+                continue # User already created a plan for next week
+
+            # Fetch previous week's plans to clone
+            prev_plans_res = supabase.table("weekly_plans") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .eq("week_start_date", prev_monday_str) \
+                .execute()
+
+            prev_plans = prev_plans_res.data or []
+            if not prev_plans:
+                continue
+
+            # Clone previous week's plans into next week
+            cloned_plans = []
+            for plan in prev_plans:
+                if not isinstance(plan, dict):
+                    continue
+                cloned_plans.append({
+                    "user_id": user_id,
+                    "week_start_date": next_monday_str,
+                    "day_of_week": plan.get("day_of_week"),
+                    "meal_type": plan.get("meal_type"),
+                    "title": plan.get("title"),
+                    "description": plan.get("description"),
+                    "prep_required": plan.get("prep_required", False),
+                    "image_url": plan.get("image_url"),
+                    "prep_instruction": plan.get("prep_instruction"),
+                    "calorie_info": plan.get("calorie_info"),
+                    "balanced_advice": plan.get("balanced_advice"),
+                    "alternative_dish": plan.get("alternative_dish"),
+                    "prep_completed": False
+                })
+
+            # Upsert into Supabase
+            supabase.table("weekly_plans").upsert(
+                cloned_plans, 
+                on_conflict="user_id,week_start_date,day_of_week,meal_type"
+            ).execute()
+
+            print(f"✅ Successfully auto-filled next week's menu for user {user_id}")
+
+    except Exception as e:
+        print(f"❌ Error in background auto-fill scheduler: {e}")
+
+# Schedule the task: Every Sunday at 12:00 PM (12:00)
+scheduler.add_job(
+    auto_fill_all_users_next_week, 
+    CronTrigger(day_of_week='sun', hour=12, minute=0)
+)
+
+# Define Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start the scheduler
+    scheduler.start()
+    print("🚀 APScheduler started successfully.")
+    yield
+    # Shutdown: Shut down the scheduler
+    scheduler.shutdown()
+    print("🛑 APScheduler shut down.")
+
+# Pass lifespan to FastAPI app instance
+app = FastAPI(lifespan=lifespan)
+
 def get_active_groq_model() -> str:
     """
     Queries the Groq API for available models on the active API key
@@ -289,7 +411,7 @@ def analyze_dish_nutrition_and_alternatives(dish_title: str, meal_type: str) -> 
     Provide:
     1. "calorie_info": Calorie count and macro breakdown for a single serving.
     2. "balanced_advice": Recommended portion quantity and healthy protein/fiber pairing (e.g. eat 2 appam with quarter bowl of green peas).
-    3. "alternative_dish": One healthy alternative replacement dish for this meal slot.
+    3. "alternative_dish": One healthy alternative replacement dish for this meal slot which is in same category as {dish_title}.
 
     Return ONLY a raw JSON object matching this exact schema:
     {{

@@ -5,3 +5,4 @@ SQLAlchemy
 pydantic
 Groq
 python-dotenv
+apscheduler
