@@ -18,12 +18,20 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 
-# Initialize Background Scheduler
-scheduler = BackgroundScheduler()
-
 load_dotenv()
 
-app = FastAPI(title="Foodie Meal Planner API")
+# Define Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start the scheduler
+    scheduler.start()
+    print("🚀 APScheduler started successfully.")
+    yield
+    # Shutdown: Shut down the scheduler
+    scheduler.shutdown()
+    print("🛑 APScheduler shut down.")
+
+app = FastAPI(title="Foodie Meal Planner API", lifespan=lifespan)
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 # CORS configuration for Frontend
@@ -34,7 +42,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
-    "https://mealplanner-amalbasheer.vercel.app"
+    "https://mealplanner-amalbasheer.vercel.app",
 ]
 
 app.add_middleware(
@@ -53,6 +61,8 @@ if SUPABASE_URL is None or SUPABASE_KEY is None:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Initialize Background Scheduler
+scheduler = BackgroundScheduler()
 # ==================== DATA MODELS ====================
 
 class Recipe(BaseModel):
@@ -215,19 +225,8 @@ scheduler.add_job(
     CronTrigger(day_of_week='sun', hour=12, minute=0)
 )
 
-# Define Lifespan context manager
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Start the scheduler
-    scheduler.start()
-    print("🚀 APScheduler started successfully.")
-    yield
-    # Shutdown: Shut down the scheduler
-    scheduler.shutdown()
-    print("🛑 APScheduler shut down.")
 
-# Pass lifespan to FastAPI app instance
-app = FastAPI(lifespan=lifespan)
+
 
 def get_active_groq_model() -> str:
     """
@@ -473,23 +472,94 @@ def get_recipes():
     response = supabase.table("recipes").select("*").execute()
     return response.data
 
+def get_previous_week_monday(date_str: str) -> str:
+    """Calculates Monday date string for the week prior to the given date."""
+    current_monday = datetime.strptime(date_str, "%Y-%m-%d").date()
+    prev_monday = current_monday - timedelta(days=7)
+    return prev_monday.strftime("%Y-%m-%d")
+
 @app.get("/api/weekly-plans")
 def get_user_weekly_plans(
     user_id: str = Query(..., description="Unique user identifier"),
     week_start_date: Optional[str] = None
 ):
     """
-    Fetches the 21-meal plan specifically assigned to the given user ID.
+    Fetches the 21-meal plan assigned to the given user ID for a specific week.
+    If no plans exist, it automatically clones the previous week's menu as a fallback.
     """
     target_week = week_start_date or get_current_week_monday()
     
-    query = supabase.table("weekly_plans") \
-        .select("*") \
-        .eq("user_id", user_id) \
-        .eq("week_start_date", target_week)
+    try:
+        # 1. Query requested week's plans
+        response = supabase.table("weekly_plans") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .eq("week_start_date", target_week) \
+            .execute()
+            
+        current_plans = response.data or []
+
+        # 2. If user already has plans for this week, return them
+        if len(current_plans) > 0:
+            return {
+                "status": "success",
+                "plans": current_plans,
+                "auto_cloned": False
+            }
+
+        # 3. If empty, check previous week's plans to auto-clone
+        prev_week_start = get_previous_week_monday(target_week)
         
-    response = query.execute()
-    return response.data
+        prev_response = supabase.table("weekly_plans") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .eq("week_start_date", prev_week_start) \
+            .execute()
+
+        prev_plans = prev_response.data or []
+
+        # 4. If previous week exists, clone it for the target week
+        if len(prev_plans) > 0:
+            new_cloned_plans = []
+            for plan in prev_plans:
+                if not isinstance(plan, dict):
+                    continue
+                new_cloned_plans.append({
+                    "user_id": user_id,
+                    "week_start_date": target_week,
+                    "day_of_week": plan.get("day_of_week"),
+                    "meal_type": plan.get("meal_type"),
+                    "title": plan.get("title"),
+                    "description": plan.get("description"),
+                    "prep_required": plan.get("prep_required", False),
+                    "image_url": plan.get("image_url"),
+                    "prep_instruction": plan.get("prep_instruction"),
+                    "calorie_info": plan.get("calorie_info"),
+                    "balanced_advice": plan.get("balanced_advice"),
+                    "alternative_dish": plan.get("alternative_dish"),
+                    "prep_completed": False
+                })
+
+            insert_response = supabase.table("weekly_plans") \
+                .upsert(new_cloned_plans, on_conflict="user_id,week_start_date,day_of_week,meal_type") \
+                .execute()
+
+            return {
+                "status": "success",
+                "plans": insert_response.data or new_cloned_plans,
+                "auto_cloned": True
+            }
+
+        # 5. Fallback if completely empty
+        return {
+            "status": "success",
+            "plans": [],
+            "auto_cloned": False
+        }
+
+    except Exception as e:
+        print(f"Error fetching/cloning weekly plans for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/preferences")
 def save_preferences(prefs: UserPreferences):
