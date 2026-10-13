@@ -73,6 +73,7 @@ class CustomMealItem(BaseModel):
     week_start_date: Optional[str] = None
     image_url: Optional[str] = None
 
+
 class PrepStep(BaseModel):
     action: str
     offset_day: str  # "previous_day" or "same_day"
@@ -276,6 +277,68 @@ def analyze_and_enrich_dish(dish_title: str, meal_type: str) -> str:
     except Exception as e:
         print(f"Dynamic description error for {dish_title}: {e}")
         return f"Freshly prepared {dish_title} for your {meal_type}."
+
+
+def analyze_dish_nutrition_and_alternatives(dish_title: str, meal_type: str) -> dict:
+    """
+    Dynamically generates calorie info, balanced eating advice, and a healthier alternative 
+    for ANY dish using Groq LLM without JSON validation enforcement errors.
+    """
+    prompt = f"""
+    Analyze the dish: "{dish_title}" served for "{meal_type}".
+    Provide:
+    1. "calorie_info": Calorie count and macro breakdown for a single serving.
+    2. "balanced_advice": Recommended portion quantity and healthy protein/fiber pairing (e.g. eat 2 appam with quarter bowl of green peas).
+    3. "alternative_dish": One healthy alternative replacement dish for this meal slot.
+
+    Return ONLY a raw JSON object matching this exact schema:
+    {{
+        "calorie_info": "~120 kcal per serving, 25g carbs, 3g protein",
+        "balanced_advice": "Eat 2 units with a quarter bowl of green peas curry for balanced protein & fiber.",
+        "alternative_dish": "Ragi Dosa with mint chutney"
+    }}
+    """
+
+    default_fallback = {
+        "calorie_info": f"Calorie info for {dish_title} (approx. 250-350 kcal per serving)",
+        "balanced_advice": "Pair with a side of fresh greens or protein.",
+        "alternative_dish": "Whole grain alternative"
+    }
+
+    try:
+        active_model = "openai/gpt-oss-120b"  # Or your active Groq model like "llama-3.3-70b-versatile"
+
+        completion = groq_client.chat.completions.create(
+            model=active_model,
+            messages=[
+                {"role": "system", "content": "You are an expert nutritionist and culinary advisor. Output valid raw JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=300
+        )
+        
+        raw_content = (completion.choices[0].message.content or "").strip()
+        
+        if not raw_content:
+            return default_fallback
+
+        # Extract JSON using regular expressions to safely isolate the payload
+        json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+        if json_match:
+            raw_content = json_match.group(0)
+            
+        result = json.loads(raw_content)
+        
+        return {
+            "calorie_info": result.get("calorie_info") or default_fallback["calorie_info"],
+            "balanced_advice": result.get("balanced_advice") or default_fallback["balanced_advice"],
+            "alternative_dish": result.get("alternative_dish") or default_fallback["alternative_dish"]
+        }
+        
+    except Exception as e:
+        print(f"Dynamic nutrition analysis error for {dish_title}: {e}")
+        return default_fallback
     
 # ==================== API ENDPOINTS ====================
 
@@ -386,6 +449,9 @@ def set_custom_meal(meal: CustomMealItem):
     # Use user-provided description if given, otherwise use AI-generated description
     final_description = meal.description if (meal.description and meal.description.strip()) else ai_description
 
+    # 3. NEW: Generate Nutrition, Balanced Advice & Alternative Dish using Groq
+    nutrition_data = analyze_dish_nutrition_and_alternatives(meal.recipe_title, meal.meal_type)
+    
     data = {
         "user_id": meal.user_id,
         "day_of_week": meal.day,
@@ -395,7 +461,10 @@ def set_custom_meal(meal: CustomMealItem):
         "prep_required": final_prep_required,
         "week_start_date": week_start,
         "image_url": image_link,
-        "prep_instruction": json.dumps(prep_steps) if prep_steps else None
+        "prep_instruction": json.dumps(prep_steps) if prep_steps else None,
+        "calorie_info": nutrition_data.get("calorie_info"),
+        "balanced_advice": nutrition_data.get("balanced_advice"),
+        "alternative_dish": nutrition_data.get("alternative_dish")
     }
     if final_prep_required:
        auto_schedule_prep_reminder(meal.user_id, week_start, meal.day, meal.meal_type, meal.recipe_title)
@@ -407,7 +476,8 @@ def set_custom_meal(meal: CustomMealItem):
         "status": "success", 
         "updated_meal": response.data,
         "auto_detected_prep": final_prep_required,
-        "prep_steps": prep_steps
+        "prep_steps": prep_steps,
+        "nutrition": nutrition_data
     }
 
 @app.get("/api/smart-prep-schedule")

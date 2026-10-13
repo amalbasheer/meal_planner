@@ -3,10 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
          ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
-         CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot,
+         CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot, RefreshCw, UtensilsCrossed,
          Edit, AlarmClock,
          ChefHat,
          Clock,
+         Activity,
+         Sparkles,
 } from 'lucide-react';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -23,6 +25,9 @@ interface MealPlan {
   image_url?: string;
   prep_completed?: boolean;
   prep_instruction?: any; // Can be a JSON object or string
+  calorie_info?: string;
+  balanced_advice?: string;
+  alternative_dish?: string;
 }
 
 
@@ -472,6 +477,37 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     console.error("Grocery toggle error:", err);
   }
 };
+
+// Handler to switch the current dish to the AI-suggested alternative
+  const handleSwitchToAlternative = async (alternativeTitle: string, day: string, mealType: string) => {
+    try {
+      const response = await fetch('https://meal-planner-gon1.onrender.com/api/menu/custom-slot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId, // Ensure you have your active user ID here
+          day: day,
+          meal_type: mealType,
+          recipe_title: alternativeTitle,
+          description: `Healthy alternative swap for ${mealType}`,
+          week_start_date: currentWeekStart,
+          prep_required: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to switch meal alternative');
+      }
+
+      // Refresh weekly plans to display the newly switched dish
+      fetchWeeklyPlans();
+    } catch (err) {
+      console.error('Error switching to alternative dish:', err);
+      alert('Could not switch dish. Please try again.');
+    }
+  };
   
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading Foodie...</div>;
@@ -749,21 +785,61 @@ if (!userId) {
                   </div>
 
                   {currentMeal ? (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <img
-                        src={currentMeal.image_url || getCorrespondingDishImage(currentMeal.title)}
-                        alt={currentMeal.title}
-                        style={{ width: '72px', height: '72px', objectFit: 'cover' }}
-                        className="rounded-xl shadow-sm shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-serif font-bold text-stone-800 text-base">
-                          {currentMeal.title}
-                        </h3>
-                        <p className="text-xs text-stone-600 mt-0.5 line-clamp-2">
-                          {currentMeal.description || 'No description provided.'}
-                        </p>
+                    <div className="flex flex-col gap-3">
+                      {/* Top Row: Image + Dish Title & Description */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <img
+                          src={currentMeal.image_url || getCorrespondingDishImage(currentMeal.title)}
+                          alt={currentMeal.title}
+                          style={{ width: '72px', height: '72px', objectFit: 'cover' }}
+                          className="rounded-xl shadow-sm shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-serif font-bold text-stone-800 text-base">
+                            {currentMeal.title}
+                          </h3>
+                          <p className="text-xs text-stone-600 mt-0.5 line-clamp-2">
+                            {currentMeal.description || 'No description provided.'}
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Bottom Row: 📊 Calorie Breakdown & Balanced Guidance Card */}
+                      {currentMeal.calorie_info && (
+                        <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl p-3 space-y-2 text-xs shadow-inner w-full mt-1">
+                          {/* Calories / Macros */}
+                          <div className="flex items-start gap-2">
+                            <span className="text-amber-900 font-bold shrink-0 flex items-center gap-1"> 
+                              <Activity className="w-4 h-4 text-amber-800" /> Nutrition:
+                            </span>
+                            <p className="text-stone-700">{currentMeal.calorie_info}</p>
+                          </div>
+
+                          {/* Balanced Eating Tips */}
+                          <div className="flex items-start gap-2">
+                            <span className="text-amber-900 font-bold shrink-0 flex items-center gap-1"> 
+                              <Sparkles className="w-4 h-4 text-amber-800" /> Balanced Way:
+                            </span>
+                            <p className="text-stone-700">{currentMeal.balanced_advice}</p>
+                          </div>
+
+                          {/* Healthy Alternative Switcher */}
+                          {currentMeal.alternative_dish && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2.5 mt-1 border-t border-amber-200/50 gap-2">
+                              <span className="text-stone-600 text-[11px] truncate max-w-[280px] flex items-center gap-1" title={currentMeal.alternative_dish}>
+                                <UtensilsCrossed className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                <span>Healthier Swap: <strong className="text-amber-950">{currentMeal.alternative_dish}</strong></span>
+                              </span>
+                              <button 
+                                onClick={() => handleSwitchToAlternative(currentMeal.alternative_dish, selectedDay, mealType)}
+                                className="bg-amber-800 hover:bg-amber-900 text-amber-50 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm shrink-0 flex items-center justify-center gap-1"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" /> Switch to this
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button 
@@ -774,7 +850,7 @@ if (!userId) {
                         setCustomPrep(false);
                         setShowCustomModal(true);
                       }}
-                      className="w-full py-4 border-2 border-dashed border-amber-200/80 text-amber-800/70 hover:bg-amber-50/50 rounded-xl text-xs font-semibold transition-all flex items-center gap-2"
+                      className="w-full py-4 border-2 border-dashed border-amber-200/80 text-amber-800/70 hover:bg-amber-50/50 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="ml-1">Add {mealType} Dish</span>
