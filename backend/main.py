@@ -427,7 +427,7 @@ def analyze_dish_nutrition_and_alternatives(dish_title: str, meal_type: str) -> 
     }
 
     try:
-        active_model = "openai/gpt-oss-120b"  # Or your active Groq model like "llama-3.3-70b-versatile"
+        active_model = "openai/gpt-oss-20b"  # Or your active Groq model like "llama-3.3-70b-versatile"
 
         completion = groq_client.chat.completions.create(
             model=active_model,
@@ -435,21 +435,31 @@ def analyze_dish_nutrition_and_alternatives(dish_title: str, meal_type: str) -> 
                 {"role": "system", "content": "You are an expert nutritionist and culinary advisor. Output valid raw JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2,
-            max_tokens=300
+            temperature=0.1,
+            max_tokens=600
         )
-        
-        raw_content = (completion.choices[0].message.content or "").strip()
-        
-        if not raw_content:
+        if not completion.choices or not completion.choices[0].message.content:
             return default_fallback
 
-        # Extract JSON using regular expressions to safely isolate the payload
+        raw_content = completion.choices[0].message.content.strip()
+
+        # Clean potential markdown block formatting
         json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-        if json_match:
-            raw_content = json_match.group(0)
+        json_str = json_match.group(0) if json_match else raw_content
             
-        result = json.loads(raw_content)
+        try:
+            result = json.loads(json_str)
+        except json.JSONDecodeError:
+            # Salvage via regex if anything got clipped
+            cal_match = re.search(r'"calorie_info"\s*:\s*"([^"]*)', raw_content)
+            adv_match = re.search(r'"balanced_advice"\s*:\s*"([^"]*)', raw_content)
+            alt_match = re.search(r'"alternative_dish"\s*:\s*"([^"]*)', raw_content)
+            
+            result = {
+                "calorie_info": cal_match.group(1) if cal_match else None,
+                "balanced_advice": adv_match.group(1) if adv_match else None,
+                "alternative_dish": alt_match.group(1) if alt_match else None
+            }
         
         return {
             "calorie_info": result.get("calorie_info") or default_fallback["calorie_info"],
@@ -458,7 +468,7 @@ def analyze_dish_nutrition_and_alternatives(dish_title: str, meal_type: str) -> 
         }
         
     except Exception as e:
-        print(f"Dynamic nutrition analysis error for {dish_title}: {e}")
+        print(f"❌ Dynamic nutrition analysis error for {dish_title}: {e}")
         return default_fallback
     
 # ==================== API ENDPOINTS ====================
@@ -590,31 +600,94 @@ def get_user_preferences(user_id: str):
 
 def auto_schedule_prep_reminder(user_id: str, week_start_date: str, day_of_week: str, meal_type: str, dish_title: str):
     """
-    Automatically calculates the prep date (previous day) and creates 
-    a Google Task or reminder in Supabase / Google Tasks for the user.
+    Dynamically analyzes prep requirements, parses multiple steps (e.g., soaking vs grinding) 
+    with their individual timings (handling formats like 'previous day 4 00 pm'), 
+    and creates separate scheduled reminder tasks in Supabase user_prep_tasks.
     """
+    # 1. Call your dynamic Groq prep analysis function
+    prep_required, steps = analyze_dish_prep_requirements(dish_title, meal_type, day_of_week)
+
+    # Calculate base meal date
     day_map = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
     base_monday = datetime.strptime(week_start_date, "%Y-%m-%d")
     target_offset = day_map.get(day_of_week, 0)
-    
     meal_date = base_monday + timedelta(days=target_offset)
-    prep_date = meal_date - timedelta(days=1)  # Previous day
-    prep_date_str = prep_date.strftime("%Y-%m-%d")
 
-    task_payload = {
-        "user_id": user_id,
-        "title": f"🍳 Prep for {day_of_week} {meal_type}: {dish_title}",
-        "description": f"Advance preparation (soaking/fermenting) required for {dish_title}.",
-        "reminder_date": prep_date_str,
-        "reminder_time": "20:00:00", # 8:00 PM evening prior
-        "completed": False
-    }
-
-    # Automatically save to your user tasks table or Google Tasks
+    # 2. Clear any existing prep tasks for this specific meal slot first to avoid duplicates/stale data
     try:
-        supabase.table("user_prep_tasks").upsert(task_payload).execute()
+        supabase.table("user_prep_tasks") \
+            .delete() \
+            .eq("user_id", user_id) \
+            .ilike("title", f"%{dish_title}%") \
+            .execute()
     except Exception as e:
-        print("Auto-task creation note:", e)
+        print("Error clearing previous prep tasks:", e)
+
+    if not prep_required or not steps:
+        print(f"No advance prep required for {dish_title}.")
+        return
+
+    task_payloads = []
+
+    # 3. Loop through each step returned by Groq and parse individually
+    for step in steps:
+        timing_str = step.get("timing", "").lower()
+        action_str = step.get("action", "")
+
+        # Calculate reminder date
+        if "previous day" in timing_str or "prev day" in timing_str:
+            prep_date = meal_date - timedelta(days=1)
+        elif "same day" in timing_str:
+            prep_date = meal_date
+        else:
+            prep_date = meal_date - timedelta(days=1)  # Default fallback
+
+        prep_date_str = prep_date.strftime("%Y-%m-%d")
+
+        # Parse time dynamically (handles "4 00 pm", "4:00 PM", "8:00pm", etc.)
+        reminder_time_str = "20:00:00"  # Default fallback
+        time_match = re.search(r'(\d{1,2})[:\s]?(\d{2})?\s*(am|pm)', timing_str, re.IGNORECASE)
+        
+        if time_match:
+            hour = int(time_match.group(1))
+            minute = int(time_match.group(2)) if time_match.group(2) else 0
+            ampm = time_match.group(3).lower()
+
+            if ampm == 'pm' and hour < 12:
+                hour += 12
+            elif ampm == 'am' and hour == 12:
+                hour = 0
+                
+            reminder_time_str = f"{hour:02d}:{minute:02d}:00"
+
+        # Detect action type to give each row a clean, distinct title
+        action_lower = action_str.lower()
+        step_tag = "Prep"
+        if "soak" in action_lower:
+            step_tag = "Soak"
+        elif "grind" in action_lower:
+            step_tag = "Grind"
+        elif "proof" in action_lower or "ferment" in action_lower:
+            step_tag = "Ferment/Proof"
+        elif "marin" in action_lower:
+            step_tag = "Marinate"
+
+        task_payloads.append({
+            "user_id": user_id,
+            "title": f"{step_tag} for {day_of_week} {meal_type}: {dish_title}",
+            "description": action_str,
+            "reminder_date": prep_date_str,
+            "reminder_time": reminder_time_str,
+            "completed": False
+        })
+
+    # 4. Insert all parsed step rows into Supabase in batch
+    if task_payloads:
+        try:
+            supabase.table("user_prep_tasks").insert(task_payloads).execute()
+            print(f"Successfully scheduled {len(task_payloads)} distinct prep tasks for {dish_title}")
+        except Exception as e:
+            print("Auto-task batch creation error:", e)
 
 
 @app.post("/api/menu/custom-slot")
