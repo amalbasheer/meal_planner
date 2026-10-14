@@ -6,3 +6,4 @@ pydantic
 Groq
 python-dotenv
 apscheduler
+pywebpush

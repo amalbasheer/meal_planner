@@ -18,6 +18,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 
+from pywebpush import webpush, WebPushException
+
 load_dotenv()
 
 # Define Lifespan context manager
@@ -1091,7 +1093,148 @@ def toggle_grocery_item(req: GroceryToggleRequest):
         return {"status": "success", "data": updated.data}
 
     return {"status": "error", "message": "Invalid item index"}
+
+# 1. Endpoint to save browser push subscriptions
+@app.post("/api/save-push-subscription")
+def save_push_subscription(payload: dict):
+    user_id = payload.get("user_id")
+    subscription = payload.get("subscription")
     
+    try:
+        supabase.table("push_subscriptions").upsert({
+            "user_id": user_id,
+            "subscription_json": json.dumps(subscription)
+        }, on_conflict="user_id").execute()
+        return {"status": "success"}
+    except Exception as e:
+        print("Subscription save error:", e)
+        return {"status": "error", "message": str(e)}
+
+def check_and_send_due_reminders():
+    now = datetime.now()
+    current_date = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M:%S") # Match current time down to seconds
+    
+    print(f"⏰ APScheduler running check at: {current_date} {current_time}")
+
+    try:
+        # Fetch tasks due right now or earlier that haven't been completed
+        # Note: We check reminder_time <= current_time for today's date
+        response = supabase.table("user_prep_tasks") \
+            .select("*") \
+            .eq("reminder_date", current_date) \
+            .lte("reminder_time", current_time) \
+            .eq("completed", False) \
+            .execute()
+
+        due_tasks = response.data or []
+        print(f"📊 Found {len(due_tasks)} potential due tasks.")
+
+        for task in due_tasks:
+            if not isinstance(task, dict):
+                continue
+            
+            task_id = task.get("id")
+            user_id = task.get("user_id")
+            if not user_id or not task_id:
+                continue
+            
+            # Fetch target user's push subscription endpoint
+            sub_res = supabase.table("push_subscriptions") \
+                .select("subscription_json") \
+                .eq("user_id", user_id) \
+                .execute()
+                
+            subscriptions = sub_res.data
+            if not isinstance(subscriptions, list) or not subscriptions:
+                continue
+
+            subscription_row = subscriptions[0]
+            if not isinstance(subscription_row, dict):
+                continue
+            subscription_json = subscription_row.get("subscription_json")
+            
+            if isinstance(subscription_json, str):
+                try:
+                    subscription_info = json.loads(subscription_json)
+                except Exception:
+                    continue
+            elif isinstance(subscription_json, dict):
+                subscription_info = subscription_json
+            else:
+                continue
+
+            push_payload = {
+                "title": f"🔔 {task['title']}",
+                "message": task['description'] or "Time for your scheduled task!",
+                "url": "/dashboard"
+            }
+
+            try:
+                webpush(
+                    subscription_info=subscription_info,
+                    data=json.dumps(push_payload),
+                    vapid_private_key="private_key.pem",
+                    vapid_claims={"sub": "mailto:amalkbasheer@gmail.com"},
+                    headers={"TTL": "60"}
+                )
+                print(f"✅ Push alarm dispatched for task: {task['title']}")
+                
+                # 🛑 IMPORTANT: Mark task as completed (or update a 'notified' flag) 
+                # so it doesn't trigger again on the next minute check!
+                supabase.table("user_prep_tasks") \
+                    .update({"completed": True}) \
+                    .eq("id", task_id) \
+                    .execute()
+                    
+            except WebPushException as ex:
+                print(f"❌ WebPush Error: {ex}")
+                if hasattr(ex, 'response') and ex.response is not None:
+                    print(f"Response Body: {ex.response.text}")
+
+    except Exception as e:
+        print("Error in background reminder worker:", e)
+
+# 3. Add the job to run every minute
+scheduler.add_job(check_and_send_due_reminders, 'cron', minute='*')
+        
+@app.get("/api/test-push/{user_id}")
+def test_push(user_id: str):
+    sub_res = supabase.table("push_subscriptions").select("subscription_json").eq("user_id", user_id).execute()
+    subscription_rows = sub_res.data
+    if not isinstance(subscription_rows, list) or not subscription_rows:
+        return {"error": "No subscription found for this user in Supabase"}
+    
+    subscription_row = subscription_rows[0]
+    if not isinstance(subscription_row, dict):
+        return {"error": "Invalid subscription record"}
+
+    sub_info = subscription_row.get("subscription_json")
+    if isinstance(sub_info, str):
+        try:
+            sub_info = json.loads(sub_info)
+        except (TypeError, json.JSONDecodeError):
+            return {"error": "Invalid subscription JSON"}
+    if not isinstance(sub_info, dict):
+        return {"error": "Invalid subscription data"}
+
+    try:
+        res = webpush(
+            subscription_info=sub_info,
+            data=json.dumps({"title": "Test Alarm", "message": "Does this work?", "url": "/dashboard"}),
+            vapid_private_key="private_key.pem",
+            vapid_claims={"sub": "mailto:amalkbasheer@gmail.com"},
+            headers={"TTL": "60"}
+        )
+        return {"success": True, "status_code": getattr(res, "status_code", None)}
+    except WebPushException as e:
+        error_body = e.response.text if e.response is not None else "No response body returned"
+        print(f"❌ WEPUSH ERROR BODY: {error_body}")
+        return {
+            "error": str(e),
+            "response_body": error_body
+        }
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8001))

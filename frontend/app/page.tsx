@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import NotificationManager from '../components/NotificationManager';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
          ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
          CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot, RefreshCw, UtensilsCrossed,
@@ -631,7 +632,14 @@ if (!userId) {
         Logout
       </button>
     </div>
-
+    {/* 🔔 NOTIFICATION MANAGER INTEGRATION */}
+      {userId ? (
+        <NotificationManager userId={userId} />
+      ) : (
+        <div className="p-4 bg-gray-50 border rounded-lg mb-4 text-sm text-gray-600">
+          Please log in to enable push alarm notifications.
+        </div>
+      )}
   </div>
 </header>
 
