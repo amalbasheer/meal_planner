@@ -65,6 +65,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize Background Scheduler
 scheduler = BackgroundScheduler()
+
+vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY")
 # ==================== DATA MODELS ====================
 
 class Recipe(BaseModel):
@@ -1174,7 +1176,7 @@ def check_and_send_due_reminders():
                 webpush(
                     subscription_info=subscription_info,
                     data=json.dumps(push_payload),
-                    vapid_private_key="private_key.pem",
+                    vapid_private_key=vapid_private_key,
                     vapid_claims={"sub": "mailto:amalkbasheer@gmail.com"},
                     headers={"TTL": "60"}
                 )
@@ -1222,7 +1224,7 @@ def test_push(user_id: str):
         res = webpush(
             subscription_info=sub_info,
             data=json.dumps({"title": "Test Alarm", "message": "Does this work?", "url": "/dashboard"}),
-            vapid_private_key="private_key.pem",
+            vapid_private_key=vapid_private_key,
             vapid_claims={"sub": "mailto:amalkbasheer@gmail.com"},
             headers={"TTL": "60"}
         )

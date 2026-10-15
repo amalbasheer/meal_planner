@@ -6,3 +6,4 @@ build/
 .env
 .env.local
 __pycache__/
+private_key.pem
