@@ -1,11 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import AppInfoModal from '../components/AppInfoModal';
 import NotificationManager from '../components/NotificationManager';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
          ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
          CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot, RefreshCw, UtensilsCrossed,
-         Edit, AlarmClock,
+         Edit, AlarmClock, InfoIcon, Lock, Copy,
          ChefHat,
          Clock,
          Activity,
@@ -72,11 +73,16 @@ function getMondayOfCurrentWeek(): string {
 }
 
 export default function MealPlannerPage() {
-  const [selectedDay, setSelectedDay] = useState('Mon');
+  // Helper to get today's full day name
+const getCurrentDayName = () => {
+  const options: Intl.DateTimeFormatOptions = { weekday: 'short' }; // returns "Monday", "Thursday", etc.
+  return new Intl.DateTimeFormat('en-US', options).format(new Date());
+};
+  const [selectedDay, setSelectedDay] = useState(getCurrentDayName());
   const [weeklyPlans, setWeeklyPlans] = useState<MealPlan[]>([]);
   const [prepTasks, setPrepTasks] = useState<any[]>([]);
   const [activeAlertTask, setActiveAlertTask] = useState<any>(null);
-  
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // Modals state
   const [showPrefModal, setShowPrefModal] = useState(false);
@@ -335,7 +341,8 @@ const handleSendCopilotMessage = async () => {
       body: JSON.stringify({ user_id: userId, message: userMsg, week_start_date: getMondayOfCurrentWeek() })
     });
     const data = await res.json();
-    setChatMessages(prev => [...prev, { sender: 'ai', text: data.response_text }]);
+    setChatMessages(prev => [...prev, { sender: 'ai', text: data.response_text, action_performed: data.action_performed,
+      data: data.data}]);
     
     // Refresh grocery list if generated
     if (data.action_performed === 'grocery_generated' && data.data) {
@@ -510,6 +517,19 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
     }
   };
   
+  // Helper inside your Chat Message Component
+const handleCopyToClipboard = (groceryData) => {
+  if (!groceryData || !groceryData.items) return;
+  
+  const textTitle = groceryData.title || "Grocery List";
+  const textItems = groceryData.items.map(i => `- [ ] ${i.name}`).join('\n');
+  const fullText = `${textTitle}\n\n${textItems}`;
+
+  navigator.clipboard.writeText(fullText).then(() => {
+    alert("Grocery list copied to clipboard! You can now paste it directly into Evernote or Google Keep.");
+  });
+};
+
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading Foodie...</div>;
   }
@@ -533,11 +553,21 @@ if (!userId) {
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight text-amber-950 mb-2">
             Welcome to Foodie
+            {/* Info Button trigger */}
+          <button 
+            onClick={() => setIsInfoOpen(true)}
+            className="text-amber-300 hover:text-black bg-white hover:bg-amber-800 p-1 rounded-full text-xs transition"
+            title="App Capabilities & Info"
+          >
+            <InfoIcon className="w-5 h-5 sm:w-5.5 sm:h-5.5"/>
+          </button>
           </h1>
           <p className="text-xs sm:text-sm text-stone-600 leading-relaxed max-w-xs mx-auto">
             Your autonomous zero-effort meal planning assistant.
           </p>
         </div>
+        {/* Render Modal */}
+      <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
         
         {/* Sign In Action */}
         <button
@@ -582,6 +612,14 @@ if (!userId) {
     </div>
   <div>
     <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Foodie Meal Planner</span>
+    {/* Info Button trigger */}
+          <button 
+            onClick={() => setIsInfoOpen(true)}
+            className="text-amber-300 hover:text-white bg-amber-800/60 hover:bg-amber-800 p-1 rounded-full text-xs transition"
+            title="App Capabilities & Info"
+          >
+            <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
+          </button>
     <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
     <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
   </div>
@@ -641,6 +679,8 @@ if (!userId) {
         </div>
       )}
   </div>
+  {/* Render Modal */}
+      <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 </header>
 
         {/* Week Selection & Navigation Bar */}
@@ -1015,6 +1055,15 @@ if (!userId) {
             }`}
           >
             <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+            {/* 📋 Copy to Evernote / Notes Button for Grocery Responses */}
+            {msg.action_performed === 'grocery_generated' && msg.data && (
+              <button
+                onClick={() => handleCopyToClipboard(msg.data)}
+                className="mt-2.5 w-full bg-amber-600/80 hover:bg-amber-600 text-amber-50 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition flex items-center justify-center gap-1.5 border border-amber-500/40"
+              >
+                <span><Copy className="w-4 h-4" /></span>
+              </button>
+            )}
           </div>
         ))}
       </div>

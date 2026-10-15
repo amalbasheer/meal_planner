@@ -7,3 +7,4 @@ Groq
 python-dotenv
 apscheduler
 pywebpush
+openai

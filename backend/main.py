@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from groq import Groq
 from dotenv import load_dotenv
+from openai import OpenAI
 
 from urllib.parse import quote
 
@@ -46,6 +47,12 @@ origins = [
     "http://127.0.0.1:3002",
     "https://mealplanner-amalbasheer.vercel.app",
 ]
+
+# Initialize client using Google AI Studio free-tier endpoint
+openai_client = OpenAI(
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key=os.environ.get("GEMINI_API_KEY")
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -970,13 +977,75 @@ def copilot_chat(req: CopilotChatRequest):
         res = supabase.table("weekly_plans").select("*").eq("user_id", user_id).eq("week_start_date", target_week).execute()
         meals = res.data
         
-        items = []
-        for m in meals:
-            title = m.get("title") if isinstance(m, dict) else None
-            items.append({"name": f"Ingredients for {title or 'meal'}", "bought": False})
+        meal_titles = [
+            title
+            for m in meals
+            if isinstance(m, dict)
+            and isinstance((title := m.get("title")), str)
+            and title
+        ]
+    
+        if not meal_titles:
+         items = [
+            {"name": "Fresh vegetables & produce", "bought": False},
+            {"name": "Cooking oil & spices", "bought": False}
+        ]
+        else:
+        # 2. Use your LLM to dynamically generate real ingredients for ANY custom dish!
+            prompt = (
+               f"List the raw grocery ingredients needed for these meals: {', '.join(meal_titles)}. "
+               "CRITICAL RULES:\n"
+               "- Output ONLY a plain text list of ingredient names.\n"
+               "- Do NOT use markdown code blocks (no ```).\n"
+               "- Do NOT output JSON, brackets, quotes, or commas.\n"
+               "- One ingredient per line.")
         
-        if not items:
-            items = [{"name": "Fresh vegetables & produce", "bought": False}, {"name": "Cooking oil & spices", "bought": False}]
+            items = []
+            try:
+            # Example using Groq/OpenAI client (replace with your active LLM client code)
+                completion = openai_client.chat.completions.create(
+                model="gemini-3.5-flash-lite", # or your preferred model
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=500
+            )
+                raw_content = completion.choices[0].message.content
+                
+                # Ensure raw_content is treated as a string text block
+                content = str(raw_content).strip() if raw_content is not None else ""
+                # --- 🛡️ STRATEGY 1: Split by newlines ---
+                lines = content.split('\n')
+                for line in lines:
+                   line_str = line.strip()
+                   if not line_str:
+                     continue
+                   # 🛡️ Clean up markdown blocks, quotes, commas, and bullet markers
+                   cleaned = re.sub(r"^[\s\-\*\•\d+\.\)]+", "", line_str)
+                   cleaned = cleaned.replace("```json", "").replace("```", "")
+                   cleaned = cleaned.strip("[]{}\"', ")
+                   if cleaned and len(cleaned) > 1:
+                      items.append({"name": cleaned, "bought": False})
+            
+                # --- 🛡️ STRATEGY 2: Fallback split by commas if newlines failed ---
+                if not items and content:
+                   parts = re.split(r'[,;\n]', content)
+                   for p in parts:
+                      cleaned = re.sub(r"^[\s\-\*\•\d+\.\)]+", "", p).strip()
+                      if cleaned and len(cleaned) > 1:
+                         items.append({"name": cleaned, "bought": False})
+                        
+                # If still completely empty, trigger the exception fallback
+                if not items:
+                   raise ValueError("No valid items extracted from content.") 
+                
+            except Exception as e:
+                import traceback
+                print("❌ LLM API ERROR DETAILS:")
+                traceback.print_exc()
+                print(f"LLM grocery line-parsing error: {e}")
+                # --- 🔄 SAFE FALLBACK ---
+                for title in meal_titles:
+                   items.append({"name": f"Ingredients for {title}", "bought": False})
 
         grocery_payload = {
             "user_id": user_id,
@@ -988,8 +1057,16 @@ def copilot_chat(req: CopilotChatRequest):
         
         supabase.table("grocery_lists").upsert(grocery_payload, on_conflict="user_id,week_start_date").execute()
         
+        # Format items neatly for text display
+        formatted_list_text = "\n".join([f"- [] {item['name']}" for item in items])
+        response_message = (
+            f"Grocery List for Week {target_week}\n\n"
+            f"{formatted_list_text}\n\n"
+            f"*(Saved to your app dashboard automatically!)*"
+        )
+        
         return {
-            "response_text": "I've generated your grocery list and saved it to your notes! You can check off items as you buy them below.",
+            "response_text": response_message,
             "action_performed": "grocery_generated",
             "data": grocery_payload
         }
