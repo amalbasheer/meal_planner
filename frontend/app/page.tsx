@@ -6,7 +6,7 @@ import NotificationManager from '../components/NotificationManager';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
          ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
          CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot, RefreshCw, UtensilsCrossed,
-         Edit, AlarmClock, InfoIcon, Lock, Copy,
+         Edit, AlarmClock, InfoIcon, Lock, Copy, Download,
          ChefHat,
          Clock,
          Activity,
@@ -169,6 +169,13 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+  const [isDesktopApp, setIsDesktopApp] = useState(false);
+
+  useEffect(() => {
+    // Check if running inside the Tauri native desktop wrapper
+    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+    setIsDesktopApp(isTauri);
+  }, []);
 // Helper to get Monday of any date's week
 const getMondayOfDate = (d = new Date()) => {
   const date = new Date(d);
@@ -538,7 +545,19 @@ if (!userId) {
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-amber-50/50 px-4 py-8">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-200/60 text-center space-y-6">
-        
+        {/* 👇 Top-Right Download Button (Hidden on Tauri & Hidden on Mobile Phones) */}
+        {!isDesktopApp && (
+          <div className="hidden md:block absolute top-5 right-5">
+            <a
+              href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
+              download
+              className="inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
+              title="Download Desktop App"
+            >
+              <span>< Download className="w-4 h-4 sm:w-4.5 sm:h-4.5"/></span> Download App
+            </a>
+          </div>
+        )}
         {/* 👇 Brand Header Logo (Full version) */}
         <div className="flex justify-center pt-4">
           <img 
@@ -620,6 +639,17 @@ if (!userId) {
           >
             <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
           </button>
+          {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
+        
+          <a
+            href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
+            download
+            className="hidden md:inline-flex items-center gap-1.5 bg-amber-800/80 hover:bg-amber-700 text-amber-100 hover:text-white px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-600/50 transition shadow-sm"
+            title="Download Windows Desktop App"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-300" />
+            <span>Desktop App</span>
+          </a>
     <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
     <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
   </div>

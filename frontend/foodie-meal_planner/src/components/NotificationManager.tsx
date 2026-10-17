@@ -16,7 +16,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export default function NotificationManager({ userId }: { userId: string }) {
-  const [status, setStatus] = useState('');
+  const [, setStatus] = useState('');
 
   useEffect(() => {
     if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return;

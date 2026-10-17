@@ -1,17 +1,18 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-// @ts-expect-error AppInfoModal is a JavaScript component without a declaration file.
+// @ts-expect-error AppInfoModal is a JSX module without a TypeScript declaration.
 import AppInfoModal from '../components/AppInfoModal';
 import NotificationManager from '../components/NotificationManager';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
-         ShoppingCart, Check, X, MessageSquare, Send, Trash2, CalendarPlus, CalendarCheck, CalendarX,
-         CheckCircle2, XCircle, Circle, PlusCircle, MinusCircle, Bot, RefreshCw, UtensilsCrossed,
-         Edit, AlarmClock, InfoIcon, Lock, Copy,
+         ShoppingCart, Check, X, Send, CalendarPlus,
+         CheckCircle2, RefreshCw, UtensilsCrossed,
+         Edit, AlarmClock, InfoIcon, Copy,
          ChefHat,
          Clock,
          Activity,
          Sparkles,
+         Download,
 } from 'lucide-react';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -57,7 +58,6 @@ function getCorrespondingDishImage(dishTitle: string): string {
   }
 
   // Fallback to keyword-based search query
-  const query = encodeURIComponent(`${dishTitle} food`);
   return `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80`;
 }
 
@@ -170,6 +170,15 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  const [isDesktopApp, setIsDesktopApp] = useState(false);
+
+  useEffect(() => {
+    // Check if running inside the Tauri native desktop wrapper
+    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+    setIsDesktopApp(isTauri);
+  }, []);
+
 // Helper to get Monday of any date's week
 const getMondayOfDate = (d = new Date()) => {
   const date = new Date(d);
@@ -538,8 +547,23 @@ const handleCopyToClipboard = (groceryData: { title?: string; items?: { name: st
 if (!userId) {
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-amber-50/50 px-4 py-8">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-200/60 text-center space-y-6">
+      {/* Added 'relative' to allow absolute positioning inside the card */}
+      <div className="relative w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-200/60 text-center space-y-6">
         
+        {/* 👇 Top-Right Download Button (Hidden on Tauri & Hidden on Mobile Phones) */}
+        {!isDesktopApp && (
+          <div className="hidden md:block absolute top-5 right-5">
+            <a
+              href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
+              download
+              className="inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
+              title="Download Desktop App"
+            >
+              <span>< Download className="w-4 h-4 sm:w-4.5 sm:h-4.5"/></span> Download App
+            </a>
+          </div>
+        )}
+
         {/* 👇 Brand Header Logo (Full version) */}
         <div className="flex justify-center pt-4">
           <img 
@@ -548,28 +572,28 @@ if (!userId) {
             className="h-full object-contain" 
           />
         </div> 
-        
 
         {/* Title & Description */}
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight text-amber-950 mb-2">
             Welcome to Foodie
             {/* Info Button trigger */}
-          <button 
-            onClick={() => setIsInfoOpen(true)}
-            className="text-amber-300 hover:text-black bg-white hover:bg-amber-800 p-1 rounded-full text-xs transition"
-            title="App Capabilities & Info"
-          >
-            <InfoIcon className="w-5 h-5 sm:w-5.5 sm:h-5.5"/>
-          </button>
+            <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="text-amber-300 hover:text-black bg-white hover:bg-amber-800 p-1 rounded-full text-xs transition ml-2"
+              title="App Capabilities & Info"
+            >
+              <InfoIcon className="w-5 h-5 sm:w-5.5 sm:h-5.5 inline"/>
+            </button>
           </h1>
           <p className="text-xs sm:text-sm text-stone-600 leading-relaxed max-w-xs mx-auto">
             Your autonomous zero-effort meal planning assistant.
           </p>
         </div>
+
         {/* Render Modal */}
-      <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-        
+        <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+
         {/* Sign In Action */}
         <button
           onClick={handleGoogleLogin}
@@ -595,6 +619,7 @@ if (!userId) {
   
   return (
     <div className="w-full min-h-screen bg-amber-50/30 text-stone-900 pb-12">
+
       {/* Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
@@ -603,7 +628,7 @@ if (!userId) {
   
   {/* Title & Date Info */}
   <div className="flex items-center gap-3">
-    {/* 👇 New Logo Icon placement */}
+    {/* 👇 Logo Icon placement */}
     <div className="bg-amber-100 p-2.5 rounded-2xl border border-amber-300/30 shadow-inner shrink-0">
       <img 
         src="../favicon.ico" 
@@ -611,19 +636,40 @@ if (!userId) {
         className="w-9 h-9 sm:w-11 sm:h-11 object-contain" 
       />
     </div>
-  <div>
-    <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Foodie Meal Planner</span>
-    {/* Info Button trigger */}
-          <button 
-            onClick={() => setIsInfoOpen(true)}
-            className="text-amber-300 hover:text-white bg-amber-800/60 hover:bg-amber-800 p-1 rounded-full text-xs transition"
-            title="App Capabilities & Info"
+
+    <div>
+      {/* Category Row with Title Tag, Info Button, and Download Button */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+          Foodie Meal Planner
+        </span>
+
+        {/* Info Button trigger */}
+        <button 
+          onClick={() => setIsInfoOpen(true)}
+          className="text-amber-300 hover:text-white bg-amber-800/60 hover:bg-amber-800 p-1 rounded-full text-xs transition"
+          title="App Capabilities & Info"
+        >
+          <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
+        </button>
+
+        {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
+         {!isDesktopApp && ( 
+          <a
+            href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
+            download
+            className="hidden md:inline-flex items-center gap-1.5 bg-amber-800/80 hover:bg-amber-700 text-amber-100 hover:text-white px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-600/50 transition shadow-sm"
+            title="Download Windows Desktop App"
           >
-            <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
-          </button>
-    <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide">Craving Plan</h1>
-    <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
-  </div>
+            <Download className="w-3.5 h-3.5 text-amber-300" />
+            
+          </a>
+         )}
+      </div>
+
+      <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide mt-0.5">Craving Plan</h1>
+      <p className="text-xs text-amber-200/80 mt-0.5">{weekRangeText || 'Loading current week...'}</p>
+    </div>
   </div>
 
   {/* Actions Toolbar: Stacks 1-per-row on Mobile, Rows on Desktop */}
@@ -671,17 +717,19 @@ if (!userId) {
         Logout
       </button>
     </div>
+
     {/* 🔔 NOTIFICATION MANAGER INTEGRATION */}
-      {userId ? (
-        <NotificationManager userId={userId} />
-      ) : (
-        <div className="p-4 bg-gray-50 border rounded-lg mb-4 text-sm text-gray-600">
-          Please log in to enable push alarm notifications.
-        </div>
-      )}
+    {userId ? (
+      <NotificationManager userId={userId} />
+    ) : (
+      <div className="p-4 bg-gray-50 border rounded-lg mb-4 text-sm text-gray-600">
+        Please log in to enable push alarm notifications.
+      </div>
+    )}
   </div>
+
   {/* Render Modal */}
-      <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+  <AppInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 </header>
 
         {/* Week Selection & Navigation Bar */}

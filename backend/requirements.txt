@@ -9,3 +9,4 @@ apscheduler
 pywebpush
 openai
 create-tauri-app@4.7.5
+vite-plugin-pwa
