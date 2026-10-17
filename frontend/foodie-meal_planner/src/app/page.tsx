@@ -712,9 +712,18 @@ if (!userId) {
         >
           <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
         </button>
-
+        <div className="hidden md:block absolute top-5 right-5">
+        <button
+        onClick={handlePwaInstall}
+        className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
+      >
+        <Download className="w-4 h-4" />
+        <span>Install App</span>
+      </button>
+      </div>
         {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
          {!isDesktopApp && ( 
+          <div className="hidden md:block absolute top-5 right-5">
           <a
             href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
             download
@@ -724,6 +733,7 @@ if (!userId) {
             <Download className="w-3.5 h-3.5 text-amber-300" />
             
           </a>
+          </div>
          )}
       </div>
 
