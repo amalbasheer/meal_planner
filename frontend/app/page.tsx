@@ -489,7 +489,7 @@ const handleToggleGroceryItem = async (index: number, currentBought: boolean) =>
 // Handler to switch the current dish to the AI-suggested alternative
   const handleSwitchToAlternative = async (alternativeTitle: string, day: string, mealType: string) => {
     try {
-      const response = await fetch('https://meal-planner-gon1.onrender.com/api/menu/custom-slot', {
+      const response = await fetch(`${API_BASE_URL}/api/menu/custom-slot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

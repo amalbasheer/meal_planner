@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -60,7 +61,7 @@ export default function NotificationManager({ userId }: { userId: string }) {
         console.log("Raw subscription object being sent:", JSON.stringify(subscription));
 
         setStatus('Saving to server...');
-        const res = await fetch('http://localhost:8001/api/save-push-subscription', {
+        const res = await fetch(`${API_BASE_URL}/api/save-push-subscription`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

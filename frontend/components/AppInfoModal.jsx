@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Calendar, InfoIcon, Lock, Utensils, AlarmClock, } from 'lucide-react';
+import { Calendar, InfoIcon, Lock, Utensils, AlarmClock, Weight, } from 'lucide-react';
 
 export default function AppInfoModal({ isOpen, onClose }) {
   if (!isOpen) return null;
@@ -41,7 +41,7 @@ export default function AppInfoModal({ isOpen, onClose }) {
               <span className="text-lg"><AlarmClock /></span>
               <div>
                 <strong className="text-amber-950 dark:text-amber-100 block font-semibold">Real-Time Push Alarms</strong>
-                Background worker scans for scheduled prep tasks every minute and sends native desktop push notifications via Windows WNS/FCM.
+                Background worker scans for scheduled prep tasks every minute and sends native desktop push notifications and in app alarm.
               </div>
             </div>
 
@@ -49,7 +49,23 @@ export default function AppInfoModal({ isOpen, onClose }) {
               <span className="text-lg"><Utensils /></span>
               <div>
                 <strong className="text-amber-950 dark:text-amber-100 block font-semibold">Meal & Task Management</strong>
-                Plan, organize, and track your daily meal preparation milestones seamlessly with Supabase backend persistence.
+                Plan, organize, and track your daily meal preparation milestones seamlessly. Based on you preferrences and previous history itcan autogenerate meal plan for a week, and if you miss to add plan it will automatically repeat theprevious plan at end of the week. 
+              </div>
+            </div>
+
+            <div className="flex gap-3 items-start p-3 rounded-xl bg-amber-100/60 dark:bg-amber-900/30 border border-amber-200/40 dark:border-amber-800/40">
+              <span className="text-lg"><Weight /></span>
+              <div>
+                <strong className="text-amber-950 dark:text-amber-100 block font-semibold">Healthier Alternate</strong>
+                Calorie display, calorie intake, and healthier version for similar menu will be suggested and can switch to that menu too.
+              </div>
+            </div>
+
+            <div className="flex gap-3 items-start p-3 rounded-xl bg-amber-100/60 dark:bg-amber-900/30 border border-amber-200/40 dark:border-amber-800/40">
+              <span className="text-lg"><Bot /></span>
+              <div>
+                <strong className="text-amber-950 dark:text-amber-100 block font-semibold">Foodie Assistant</strong>
+                Smart AI assistant to guide, grocery lising, recipe etc.  
               </div>
             </div>
 
