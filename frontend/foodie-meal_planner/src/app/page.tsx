@@ -178,6 +178,58 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
     const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
     setIsDesktopApp(isTauri);
   }, []);
+  
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    // 1. Check if the app is already running as an installed PWA / Standalone window
+    const checkIsStandalone = () => {
+      const isStandaloneMode =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (navigator as any).standalone || // iOS Safari check
+        document.referrer.includes("android-app://"); // Android TWA check
+
+      setIsStandalone(isStandaloneMode);
+    };
+
+    checkIsStandalone();
+
+    // 2. Listen for the browser install prompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    // Hide button if installed during active session
+    window.addEventListener("appinstalled", () => {
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // 3. DO NOT RENDER the button if already running inside the installed app
+  if (isStandalone) {
+    return null; 
+  }
+
+  // Simple inline install logic inside your component
+const handlePwaInstall = async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setDeferredPrompt(null);
+  } else {
+    // Helpful fallback for iOS Safari or browsers without prompt support
+    alert("To install: Tap your browser menu (or Share button on iOS) and select 'Add to Home Screen'.");
+  }
+};
 
 // Helper to get Monday of any date's week
 const getMondayOfDate = (d = new Date()) => {
@@ -549,7 +601,15 @@ if (!userId) {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-amber-50/50 px-4 py-8">
       {/* Added 'relative' to allow absolute positioning inside the card */}
       <div className="relative w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-200/60 text-center space-y-6">
-        
+        <div className="hidden md:block absolute top-5 right-5">
+        <button
+        onClick={handlePwaInstall}
+        className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
+      >
+        <Download className="w-4 h-4" />
+        <span>Install App</span>
+      </button>
+      </div>
         {/* 👇 Top-Right Download Button (Hidden on Tauri & Hidden on Mobile Phones) */}
         {!isDesktopApp && (
           <div className="hidden md:block absolute top-5 right-5">
