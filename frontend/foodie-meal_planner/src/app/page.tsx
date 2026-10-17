@@ -246,6 +246,35 @@ const shouldHideDownload = isDesktopApp || isPwaStandalone;
   // 3. Clear the prompt so it can only be used once per session
   setDeferredPrompt(null);
 };
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const checkStatus = () => {
+      // 1. Tauri Desktop App Check
+      const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
+      // 2. Installed PWA Standalone Mode Check
+      const isStandalone = typeof window !== 'undefined' && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+        (navigator as any).standalone === true ||
+        document.referrer.includes('android-app://')
+      );
+
+      setIsInstalled(isTauri || isStandalone);
+    };
+
+    checkStatus();
+
+    // Listen for media query changes (e.g. if installed during session)
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleChange = () => checkStatus();
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  
 
 // Helper to get Monday of any date's week
 const getMondayOfDate = (d = new Date()) => {
@@ -736,10 +765,10 @@ if (!userId) {
         <Download className="w-4 h-4" />
         <span>Install App</span>
       </button>
-      </div>
+      
         {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
-         {!shouldHideDownload && ( 
-          <div className="hidden md:block absolute top-5 right-5">
+         {!isInstalled && ( 
+          
           <a
             href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
             download
@@ -749,8 +778,10 @@ if (!userId) {
             <Download className="w-3.5 h-3.5 text-amber-300" />
             
           </a>
-          </div>
+          
          )}
+
+         </div>
       </div>
 
       <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide mt-0.5">Craving Plan</h1>
