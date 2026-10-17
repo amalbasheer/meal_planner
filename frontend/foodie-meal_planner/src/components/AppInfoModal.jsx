@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Calendar, InfoIcon, Lock, Utensils, AlarmClock, } from 'lucide-react';
+import { Calendar, InfoIcon, Lock, Utensils, AlarmClock, Weight, Bot } from 'lucide-react';
 
 export default function AppInfoModal({ isOpen, onClose }) {
   if (!isOpen) return null;
