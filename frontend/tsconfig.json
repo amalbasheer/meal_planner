@@ -28,7 +28,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "foodie-meal_planner/src/components/AppInfoModal.jsx"  ],
   "exclude": [
     "node_modules"
   ]

@@ -172,7 +172,13 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
   };
 
   const [isDesktopApp, setIsDesktopApp] = useState(false);
+  const isPwaStandalone = typeof window !== 'undefined' && (
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (navigator as any).standalone === true
+);
 
+// Hide the button if it's EITHER the Tauri app OR the installed PWA
+const shouldHideDownload = isDesktopApp || isPwaStandalone;
   useEffect(() => {
     // Check if running inside the Tauri native desktop wrapper
     const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
@@ -219,16 +225,26 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
     return null; 
   }
 
-  // Simple inline install logic inside your component
-const handlePwaInstall = async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setDeferredPrompt(null);
-  } else {
-    // Helpful fallback for iOS Safari or browsers without prompt support
-    alert("To install: Tap your browser menu (or Share button on iOS) and select 'Add to Home Screen'.");
+  const handlePwaInstall = async () => {
+  if (!deferredPrompt) {
+    alert("Install prompt is not available right now. If already installed, enjoy the app!");
+    return;
   }
+
+  // 1. Show the browser's native install prompt modal
+  deferredPrompt.prompt();
+
+  // 2. Wait for the user to accept or dismiss the prompt
+  const { outcome } = await deferredPrompt.userChoice;
+  
+  if (outcome === 'accepted') {
+    console.log('User accepted the install prompt');
+  } else {
+    console.log('User dismissed the install prompt');
+  }
+
+  // 3. Clear the prompt so it can only be used once per session
+  setDeferredPrompt(null);
 };
 
 // Helper to get Monday of any date's week
@@ -611,7 +627,7 @@ if (!userId) {
       </button>
       </div>
         {/* 👇 Top-Right Download Button (Hidden on Tauri & Hidden on Mobile Phones) */}
-        {!isDesktopApp && (
+        {!shouldHideDownload && (
           <div className="hidden md:block absolute top-5 right-5">
             <a
               href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
@@ -722,7 +738,7 @@ if (!userId) {
       </button>
       </div>
         {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
-         {!isDesktopApp && ( 
+         {!shouldHideDownload && ( 
           <div className="hidden md:block absolute top-5 right-5">
           <a
             href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
