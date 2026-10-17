@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-// @ts-expect-error AppInfoModal is a JSX module without a TypeScript declaration.
+// @ts-ignore
 import AppInfoModal from '../components/AppInfoModal';
 import NotificationManager from '../components/NotificationManager';
 import { CalendarDays, Utensils, Menu, ChevronLeft, ChevronRight, Timer, Plus,
