@@ -724,7 +724,7 @@ if (!userId) {
         >
           <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
         </button>
-        {!shouldHideDownload && deferredPrompt(
+        {!shouldHideDownload && deferredPrompt && (
         <button
         onClick={handlePwaInstall}
         className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
