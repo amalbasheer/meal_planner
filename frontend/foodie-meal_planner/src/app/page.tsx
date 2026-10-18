@@ -738,7 +738,6 @@ if (!userId) {
         )}
         {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
          {!shouldHideDownload && ( 
-          
           <a
             href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
             download

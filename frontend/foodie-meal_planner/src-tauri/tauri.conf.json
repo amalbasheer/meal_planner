@@ -14,8 +14,7 @@
       {
         "title": "foodie-meal_planner",
         "width": 1200,
-        "height": 800,
-        "icon": "icons/icon.ico"
+        "height": 800
       }
     ],
     "security": {
