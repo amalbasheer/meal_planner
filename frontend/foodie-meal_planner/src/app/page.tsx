@@ -171,108 +171,75 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
     await supabase.auth.signOut();
   };
 
-  const [isDesktopApp, setIsDesktopApp] = useState(false);
-  const isPwaStandalone = typeof window !== 'undefined' && (
-  window.matchMedia('(display-mode: standalone)').matches ||
-  (navigator as any).standalone === true
-);
-
-// Hide the button if it's EITHER the Tauri app OR the installed PWA
-const shouldHideDownload = isDesktopApp || isPwaStandalone;
-  useEffect(() => {
-    // Check if running inside the Tauri native desktop wrapper
-    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-    setIsDesktopApp(isTauri);
-  }, []);
-  
-  const [isStandalone, setIsStandalone] = useState(false);
+  // 1. Unified Installed / Standalone Check (Tauri or PWA)
+  const [isInstalled, setIsInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // 1. Check if the app is already running as an installed PWA / Standalone window
-    const checkIsStandalone = () => {
-      const isStandaloneMode =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        (navigator as any).standalone || // iOS Safari check
-        document.referrer.includes("android-app://"); // Android TWA check
-
-      setIsStandalone(isStandaloneMode);
-    };
-
-    checkIsStandalone();
-
-    // 2. Listen for the browser install prompt event
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-
-    // Hide button if installed during active session
-    window.addEventListener("appinstalled", () => {
-      setIsStandalone(true);
-      setDeferredPrompt(null);
-    });
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  // 3. DO NOT RENDER the button if already running inside the installed app
-  if (isStandalone) {
-    return null; 
-  }
-
-  const handlePwaInstall = async () => {
-  if (!deferredPrompt) {
-    alert("Install prompt is not available right now. If already installed, enjoy the app!");
-    return;
-  }
-
-  // 1. Show the browser's native install prompt modal
-  deferredPrompt.prompt();
-
-  // 2. Wait for the user to accept or dismiss the prompt
-  const { outcome } = await deferredPrompt.userChoice;
-  
-  if (outcome === 'accepted') {
-    console.log('User accepted the install prompt');
-  } else {
-    console.log('User dismissed the install prompt');
-  }
-
-  // 3. Clear the prompt so it can only be used once per session
-  setDeferredPrompt(null);
-};
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
     const checkStatus = () => {
-      // 1. Tauri Desktop App Check
+      // Check Tauri Desktop
       const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
-      // 2. Installed PWA Standalone Mode Check
-      const isStandalone = typeof window !== 'undefined' && (
+      // Check PWA Standalone Mode (Desktop & Mobile)
+      const isPwa = typeof window !== 'undefined' && (
         window.matchMedia('(display-mode: standalone)').matches ||
         window.matchMedia('(display-mode: window-controls-overlay)').matches ||
         (navigator as any).standalone === true ||
         document.referrer.includes('android-app://')
       );
 
-      setIsInstalled(isTauri || isStandalone);
+      setIsInstalled(isTauri || isPwa);
     };
 
     checkStatus();
 
-    // Listen for media query changes (e.g. if installed during session)
-    const mediaQuery = window.matchMedia('(display-mode: standalone)');
-    const handleChange = () => checkStatus();
-    mediaQuery.addEventListener('change', handleChange);
+    // Listen for beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
 
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    // Listen for installation event
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleMediaChange = () => checkStatus();
+    mediaQuery.addEventListener('change', handleMediaChange);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      mediaQuery.removeEventListener('change', handleMediaChange);
+    };
   }, []);
+
+  // 2. Map shouldHideDownload directly to our unified check
+  const shouldHideDownload = isInstalled;
+
+  // Handler for installing the PWA when the user clicks the install button
+  const handlePwaInstall = async () => {
+    if (!deferredPrompt) {
+      alert("Install prompt is not available right now. If already installed, enjoy the app!");
+      return;
+    }
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+
+    setDeferredPrompt(null);
+  };
 
   
 
@@ -646,18 +613,19 @@ if (!userId) {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-amber-50/50 px-4 py-8">
       {/* Added 'relative' to allow absolute positioning inside the card */}
       <div className="relative w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-200/60 text-center space-y-6">
+        
         <div className="hidden md:block absolute top-5 right-5">
-        <button
-        onClick={handlePwaInstall}
-        className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
-      >
-        <Download className="w-4 h-4" />
-        <span>Install App</span>
-      </button>
-      </div>
+        {!shouldHideDownload && deferredPrompt && (
+         <button
+         onClick={handlePwaInstall}
+         className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
+        >
+         <Download className="w-4 h-4" />
+         <span>Install App</span>
+        </button>
+        )}
         {/* 👇 Top-Right Download Button (Hidden on Tauri & Hidden on Mobile Phones) */}
         {!shouldHideDownload && (
-          <div className="hidden md:block absolute top-5 right-5">
             <a
               href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
               download
@@ -666,8 +634,7 @@ if (!userId) {
             >
               <span>< Download className="w-4 h-4 sm:w-4.5 sm:h-4.5"/></span> Download App
             </a>
-          </div>
-        )}
+        )} </div>
 
         {/* 👇 Brand Header Logo (Full version) */}
         <div className="flex justify-center pt-4">
@@ -757,7 +724,7 @@ if (!userId) {
         >
           <InfoIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5"/>
         </button>
-        <div className="hidden md:block absolute top-5 right-5">
+        {!shouldHideDownload && deferredPrompt(
         <button
         onClick={handlePwaInstall}
         className="md:hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium transition shadow-sm"
@@ -765,9 +732,9 @@ if (!userId) {
         <Download className="w-4 h-4" />
         <span>Install App</span>
       </button>
-      
+        )}
         {/* 👇 Download Button (Only on Web Desktop, Hidden in Tauri & Mobile) */}
-         {!isInstalled && ( 
+         {!shouldHideDownload && ( 
           
           <a
             href="https://fjczdvbumeroarymknxu.supabase.co/storage/v1/object/public/Installers/foodie-meal_planner_0.1.0_x64_en-US.msi"
@@ -781,7 +748,7 @@ if (!userId) {
           
          )}
 
-         </div>
+         
       </div>
 
       <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-wide mt-0.5">Craving Plan</h1>
