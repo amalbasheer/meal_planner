@@ -178,7 +178,10 @@ const getFormattedWeekRange = (mondayDateStr: string) => {
   useEffect(() => {
     const checkStatus = () => {
       // Check Tauri Desktop
-      const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+      const isTauri = typeof window !== 'undefined' && (
+        '__TAURI__' in window || 
+        '__TAURI_INTERNALS__' in window
+      );
 
       // Check PWA Standalone Mode (Desktop & Mobile)
       const isPwa = typeof window !== 'undefined' && (
